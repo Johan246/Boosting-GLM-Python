@@ -91,6 +91,18 @@ predictions = model.predict(
 )
 ```
 
+## Complete notebook example
+
+[`examples/complete_method_example.ipynb`](examples/complete_method_example.ipynb) is an executed,
+self-contained walkthrough of the complete method. It creates a synthetic insurance portfolio, fits
+all three model stages, inspects the extracted and calibrated effects, evaluates holdout results,
+plots predictions, and verifies model serialization.
+
+```bash
+python -m pip install -e ".[notebook]"
+jupyter lab examples/complete_method_example.ipynb
+```
+
 ## Deliberate differences from the R code
 
 - Paths are supplied by the caller; there are no personal OneDrive or corporate SMB paths.
@@ -112,4 +124,3 @@ Tests cover data splitting, Poisson metrics, mixed numeric/categorical training,
 ## Data and licensing note
 
 This repository contains code only. `download-data` retrieves data from the original repository. Review the original datasets' provenance and applicable terms before redistribution or production use. The original repository does not declare a software license, so this port does not assert one on its behalf.
-

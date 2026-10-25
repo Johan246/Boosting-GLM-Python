@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.9"]
+notebook = ["jupyterlab>=4"]
 
 [project.scripts]
 boosting-glm = "boosting_glm.cli:main"
@@ -33,4 +34,3 @@ addopts = "-q"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-

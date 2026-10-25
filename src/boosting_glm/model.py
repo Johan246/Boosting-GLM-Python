@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+from contextlib import contextmanager
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
@@ -76,7 +78,8 @@ class BoostedGLM:
                 ("model", PoissonRegressor(alpha=1e-8, max_iter=500)),
             ]
         )
-        self.baseline_.fit(X, rate, model__sample_weight=exposure)
+        with self._cpu_warning_guard():
+            self.baseline_.fit(X, rate, model__sample_weight=exposure)
 
         self.gbm_ = Pipeline(
             [
@@ -94,7 +97,8 @@ class BoostedGLM:
                 ),
             ]
         )
-        self.gbm_.fit(X, rate, model__sample_weight=exposure)
+        with self._cpu_warning_guard():
+            self.gbm_.fit(X, rate, model__sample_weight=exposure)
         self.balance_factor_ = float(np.average(rate, weights=exposure) / np.average(self.gbm_.predict(X), weights=exposure))
 
         background = X.sample(min(len(X), self.effect_sample), random_state=self.random_state)
@@ -125,7 +129,8 @@ class BoostedGLM:
                 ("model", PoissonRegressor(alpha=self.final_alpha, max_iter=1_000)),
             ]
         )
-        self.final_.fit(calibrated, rate, model__sample_weight=exposure)
+        with self._cpu_warning_guard():
+            self.final_.fit(calibrated, rate, model__sample_weight=exposure)
         return self
 
     def predict_components(self, X: pd.DataFrame, exposure: np.ndarray) -> dict[str, np.ndarray]:
@@ -226,18 +231,38 @@ class BoostedGLM:
         sample_size = min(len(X), self.effect_sample)
         sample = X.sample(sample_size, random_state=self.random_state)
         positions = X.index.get_indexer(sample.index)
-        importance = permutation_importance(
-            self.gbm_,
-            sample,
-            rate[positions],
-            n_repeats=2,
-            random_state=self.random_state,
-            sample_weight=exposure[positions],
-            scoring="neg_mean_poisson_deviance",
-        ).importances_mean
+        with warnings.catch_warnings():
+            # Some restricted environments cannot query physical CPU topology.
+            # The query is an optimization only and does not affect model results.
+            warnings.filterwarnings(
+                "ignore",
+                message="Could not find the number of physical cores.*",
+                category=UserWarning,
+            )
+            importance = permutation_importance(
+                self.gbm_,
+                sample,
+                rate[positions],
+                n_repeats=2,
+                random_state=self.random_state,
+                sample_weight=exposure[positions],
+                scoring="neg_mean_poisson_deviance",
+            ).importances_mean
         ranked = [self.features_[i] for i in np.argsort(importance)[::-1][:4]]
         return tuple(combinations(ranked, 2))[: self.max_interactions]
 
     def _check_fitted(self) -> None:
         if not hasattr(self, "final_"):
             raise RuntimeError("Fit the model before predicting")
+
+    @staticmethod
+    @contextmanager
+    def _cpu_warning_guard():
+        """Suppress a harmless CPU-topology warning in restricted environments."""
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Could not find the number of physical cores.*",
+                category=UserWarning,
+            )
+            yield

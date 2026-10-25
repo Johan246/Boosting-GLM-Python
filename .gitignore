@@ -4,10 +4,10 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
+work-cache/
 data/raw/*
 !data/raw/.gitkeep
 outputs/*
 !outputs/.gitkeep
 *.joblib
 .DS_Store
-
